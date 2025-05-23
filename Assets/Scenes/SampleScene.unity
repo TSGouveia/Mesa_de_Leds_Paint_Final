@@ -1896,6 +1896,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 02686812b151932489f0f31e6f1272c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  drawingCanvasLayerName: DrawingCanvas
 --- !u!114 &416238981
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8987,6 +8988,12 @@ MonoBehaviour:
   warnings:
   - {fileID: 1606135831}
   - {fileID: 1127776874}
+  uiLayerMask:
+    serializedVersion: 2
+    m_Bits: 32
+  drawingSurfaceLayerMask:
+    serializedVersion: 2
+    m_Bits: 64
 --- !u!114 &1899907865
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -5,27 +5,49 @@ using UnityEngine;
 public class FileSystem : MonoBehaviour
 {
     private DrawingManager drawingManager;
-    private SaveWarning saveWarning;
-    private Color[,] lastSavedCanvas = new Color[32, 18];
+    private SaveWarning saveWarning; // Assume que este script existe
+    private Color[,] lastSavedCanvas;
+
+    private const int GRID_WIDTH = 32;
+    private const int GRID_HEIGHT = 18;
 
     private void Awake()
     {
-        drawingManager = FindAnyObjectByType<DrawingManager>();
-        saveWarning = FindAnyObjectByType<SaveWarning>();
+        drawingManager = FindObjectOfType<DrawingManager>();
+        saveWarning = FindObjectOfType<SaveWarning>();
+
+        if (drawingManager == null) Debug.LogError("FS: DrawingManager não encontrado", this);
+        if (saveWarning == null) Debug.LogWarning("FS: SaveWarning não encontrado", this);
     }
+
     private void Start()
     {
-        for (int x = 0; x < 32; x++)
+        // Inicializa lastSavedCanvas com um estado branco ou o estado atual do canvas
+        if (drawingManager != null && drawingManager.enabled) // Verifica se drawingManager está pronto
         {
-            for (int y = 0; y < 18; y++)
+            lastSavedCanvas = drawingManager.GetCanvas();
+        }
+        else
+        {
+            lastSavedCanvas = new Color[GRID_WIDTH, GRID_HEIGHT];
+            for (int x = 0; x < GRID_WIDTH; x++)
             {
-                lastSavedCanvas[x, y] = Color.white;
+                for (int y = 0; y < GRID_HEIGHT; y++)
+                {
+                    lastSavedCanvas[x, y] = Color.white;
+                }
             }
+            // Tenta obter o canvas novamente se o drawingManager ficar pronto mais tarde
+            // Invoke(nameof(InitializeLastSavedCanvas), 0.1f); // Pequeno delay
         }
     }
+    // private void InitializeLastSavedCanvas() { if(drawingManager != null) lastSavedCanvas = drawingManager.GetCanvas(); }
+
+
     public void OpenImage()
     {
-        if (drawingManager.AreStatesDifferent(drawingManager.GetCanvas(), lastSavedCanvas))
+        if (drawingManager == null || !drawingManager.enabled) return;
+        if (saveWarning != null && drawingManager.AreStatesDifferent(drawingManager.GetCanvas(), lastSavedCanvas))
         {
             saveWarning.ShowUnsavedChangesWarning(SaveAndOpen, OpenFileExplorer);
         }
@@ -34,146 +56,144 @@ public class FileSystem : MonoBehaviour
             OpenFileExplorer();
         }
     }
+
     private void OpenFileExplorer()
     {
         var extensions = new[] { new ExtensionFilter("Image Files", "png", "jpg", "jpeg") };
-        // Usando o StandaloneFileBrowser para abrir a janela de seleção de arquivos
-        string[] paths = StandaloneFileBrowser.OpenFilePanel("Choose an image", "", extensions, false);
-
+        string[] paths = StandaloneFileBrowser.OpenFilePanel("Open Image", "", extensions, false);
         if (paths.Length > 0)
         {
-            string path = paths[0]; // O caminho do arquivo selecionado
-            LoadImage(path); // Carregar a imagem
-        }
-        else
-        {
-            Debug.Log("Nenhum arquivo selecionado.");
+            LoadImageFromFile(paths[0]);
         }
     }
-    private void LoadImage(string path)
+
+    private void LoadImageFromFile(string path) // Renomeado para clareza
     {
-        // Carregar a imagem do arquivo
-        Texture2D texture = new Texture2D(2, 2); // Inicializar uma textura
+        if (drawingManager == null || !drawingManager.enabled) return;
         byte[] fileData = File.ReadAllBytes(path);
-        texture.LoadImage(fileData); // Carregar a imagem no formato de textura
-
-        // Redimensionar a imagem para 32x18
-        Texture2D resizedTexture = ResizeTexture(texture, 32, 18);
-
-        // Converter a imagem para um array de cores
-        Color[] pixels = resizedTexture.GetPixels();
-        Color[,] colorArray = new Color[32, 18];
-
-        // Preencher o array de cores 2D
-        for (int y = 0; y < 18; y++)
+        Texture2D texture = new Texture2D(2, 2); // Tamanho placeholder
+        if (!texture.LoadImage(fileData))
         {
-            for (int x = 0; x < 32; x++)
-            {
-                colorArray[x, y] = pixels[y * 32 + x]; // Atribuir as cores corretamente
-            }
-        }
-
-        // Chamar o método DrawCanvas no outro script e passar o array de cores
-        drawingManager.DrawCanvas(colorArray);
-        lastSavedCanvas = drawingManager.GetCanvas();
-    }
-
-    // Função para redimensionar a textura
-    private Texture2D ResizeTexture(Texture2D originalTexture, int targetWidth, int targetHeight)
-    {
-        Texture2D newTexture = new Texture2D(targetWidth, targetHeight);
-        float incX = 1.0f / targetWidth;
-        float incY = 1.0f / targetHeight;
-
-        for (int y = 0; y < targetHeight; y++)
-        {
-            for (int x = 0; x < targetWidth; x++)
-            {
-                newTexture.SetPixel(x, y, originalTexture.GetPixelBilinear(x * incX, y * incY));
-            }
-        }
-
-        newTexture.Apply();
-        return newTexture;
-    }
-    public void SaveImage()
-    {
-        int width = 32;
-        int height = 18;
-        Color[,] pixelColors = drawingManager.GetCanvas();
-
-        // Abrir o explorador de arquivos para o usuário escolher o local e o nome do arquivo
-        string path = StandaloneFileBrowser.SaveFilePanel("Save image", "", "image", "jpg");
-
-        // Verificar se o usuário selecionou um caminho válido
-        if (string.IsNullOrEmpty(path))
-        {
-            Debug.Log("Nenhum caminho selecionado.");
+            Debug.LogError($"FS: Falha ao carregar imagem de {path}");
             return;
         }
 
-        // Criar uma nova textura com as dimensões fornecidas
-        Texture2D texture = new Texture2D(width, height);
-
-        Color[] flatPixelColors = new Color[width * height];
-        for (int y = 0; y < height; y++)
+        Texture2D resizedTexture = ResizeTexture(texture, GRID_WIDTH, GRID_HEIGHT);
+        if (resizedTexture == null)
         {
-            for (int x = 0; x < width; x++)
-            {
-                flatPixelColors[y * width + x] = pixelColors[x, y]; // Preenchendo o array unidimensional
-            }
+            Debug.LogError($"FS: Falha ao redimensionar textura de {path}");
+            Destroy(texture); // Limpa textura original
+            return;
         }
 
-        // Atribuir os valores do array de cores à textura
+        Color[] pixels = resizedTexture.GetPixels();
+        Color[,] colorArray = new Color[GRID_WIDTH, GRID_HEIGHT];
+        for (int y = 0; y < GRID_HEIGHT; y++)
+        {
+            for (int x = 0; x < GRID_WIDTH; x++)
+            {
+                colorArray[x, y] = pixels[y * GRID_WIDTH + x];
+            }
+        }
+        Destroy(texture); // Limpa textura original
+        Destroy(resizedTexture); // Limpa textura redimensionada
+
+        drawingManager.LoadCanvasState(colorArray); // USA O MÉTODO CORRETO
+        lastSavedCanvas = drawingManager.GetCanvas();
+    }
+
+    private Texture2D ResizeTexture(Texture2D originalTexture, int targetWidth, int targetHeight)
+    {
+        // Usar RenderTexture para melhor qualidade e performance de redimensionamento
+        RenderTexture rt = RenderTexture.GetTemporary(targetWidth, targetHeight);
+        rt.filterMode = FilterMode.Point; // Para pixel art, Point é melhor
+        RenderTexture.active = rt;
+        Graphics.Blit(originalTexture, rt);
+        Texture2D newTexture = new Texture2D(targetWidth, targetHeight, TextureFormat.RGBA32, false);
+        newTexture.ReadPixels(new Rect(0, 0, targetWidth, targetHeight), 0, 0);
+        newTexture.Apply(false); // false para não gerar mipmaps
+        RenderTexture.active = null; // Libera RenderTexture ativa
+        RenderTexture.ReleaseTemporary(rt);
+        return newTexture;
+    }
+
+    public void SaveImage()
+    {
+        if (drawingManager == null || !drawingManager.enabled) return;
+        Color[,] pixelColors = drawingManager.GetCanvas();
+        if (pixelColors == null) { Debug.LogError("FS: Não foi possível obter o canvas para salvar."); return; }
+
+        string path = StandaloneFileBrowser.SaveFilePanel("Save Image", "", "pixel_art_image", "png");
+        if (string.IsNullOrEmpty(path)) return;
+
+        Texture2D texture = new Texture2D(GRID_WIDTH, GRID_HEIGHT, TextureFormat.RGBA32, false);
+        Color[] flatPixelColors = new Color[GRID_WIDTH * GRID_HEIGHT];
+        for (int y = 0; y < GRID_HEIGHT; y++)
+        {
+            for (int x = 0; x < GRID_WIDTH; x++)
+            {
+                flatPixelColors[y * GRID_WIDTH + x] = pixelColors[x, y];
+            }
+        }
         texture.SetPixels(flatPixelColors);
+        texture.Apply(false);
 
-        // Aplicar as mudanças na textura
-        texture.Apply();
-
-        // Converter a textura para um formato de imagem (PNG ou JPG)
-        byte[] imageBytes = texture.EncodeToPNG();  // Pode usar EncodeToJPG() se preferir JPG
-
-        // Salvar a imagem no caminho especificado
+        byte[] imageBytes = texture.EncodeToPNG();
         File.WriteAllBytes(path, imageBytes);
+        Destroy(texture); // Libera memória
 
-        lastSavedCanvas = pixelColors;
+        lastSavedCanvas = drawingManager.GetCanvas(); // Atualiza o estado salvo
         Debug.Log($"Imagem salva em: {path}");
     }
+
     public void NewImage()
     {
-        if (drawingManager.AreStatesDifferent(drawingManager.GetCanvas(), lastSavedCanvas))
+        if (drawingManager == null || !drawingManager.enabled) return;
+        if (saveWarning != null && drawingManager.AreStatesDifferent(drawingManager.GetCanvas(), lastSavedCanvas))
         {
-            saveWarning.ShowUnsavedChangesWarning(SaveAndClearCanvas, drawingManager.ClearCanvas);
+            saveWarning.ShowUnsavedChangesWarning(SaveAndClearCanvas, ClearCanvasAndUpdateLastSaved);
         }
         else
         {
-            drawingManager.ClearCanvas();
+            ClearCanvasAndUpdateLastSaved();
         }
     }
+
+    private void ClearCanvasAndUpdateLastSaved()
+    {
+        if (drawingManager == null || !drawingManager.enabled) return;
+        drawingManager.ClearCanvas();
+        lastSavedCanvas = drawingManager.GetCanvas();
+    }
+
     private void SaveAndClearCanvas()
     {
         SaveImage();
-        drawingManager.ClearCanvas();
+        ClearCanvasAndUpdateLastSaved();
     }
+
     private void SaveAndOpen()
     {
         SaveImage();
-        OpenImage();
+        OpenFileExplorer(); // Chama OpenFileExplorer diretamente
     }
     private void SaveAndQuit()
     {
         SaveImage();
         Application.Quit();
     }
-    public void Quit()
+
+    public void RequestQuitApplication() // Renomeado
     {
-        if (drawingManager.AreStatesDifferent(drawingManager.GetCanvas(), lastSavedCanvas))
+        if (drawingManager == null || !drawingManager.enabled) { Application.Quit(); return; }
+        if (saveWarning != null && drawingManager.AreStatesDifferent(drawingManager.GetCanvas(), lastSavedCanvas))
         {
-            saveWarning.ShowUnsavedChangesWarning(SaveAndQuit, Application.Quit);
+            saveWarning.ShowUnsavedChangesWarning(SaveAndQuit, ForceQuitApplication);
         }
         else
         {
-            Application.Quit();
+            ForceQuitApplication();
         }
     }
+    private void ForceQuitApplication() { Application.Quit(); }
 }

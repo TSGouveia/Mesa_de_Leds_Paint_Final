@@ -1,46 +1,69 @@
 using UnityEngine;
 using UnityEngine.UI;
+
 public class CanvasManager : MonoBehaviour
 {
-    // Array of 32x18 images
-    private Image[,] imageArray = new Image[32, 18];
+    private Image[,] imageArray; // Removida inicialização aqui, será no Awake
+    private const int GRID_WIDTH = 32; // Mantém consistência
+    private const int GRID_HEIGHT = 18;
 
-    // Start is called before the first frame update
+    [Tooltip("Nome da Layer a ser atribuída aos pixels. Deve existir no Unity Editor.")]
+    public string drawingCanvasLayerName = "DrawingCanvas"; // Certifica-te que esta Layer existe
+
     void Awake()
     {
+        imageArray = new Image[GRID_WIDTH, GRID_HEIGHT]; // Inicializa o array aqui
         InitializeImageArray();
     }
 
-    // Initializes the image array with empty images
     void InitializeImageArray()
     {
-        for (int x = 0; x < 32; x++)
+        int drawingLayer = LayerMask.NameToLayer(drawingCanvasLayerName);
+        if (drawingLayer == -1)
         {
-            for (int y = 0; y < 18; y++)
+            Debug.LogError($"CanvasManager: Layer '{drawingCanvasLayerName}' não existe! Crie-a no Unity Editor.", this);
+        }
+
+        if (GetComponent<GridLayoutGroup>() == null)
+        {
+            Debug.LogWarning("CanvasManager: GameObject não tem um GridLayoutGroup. A organização dos pixels pode não ser a esperada.", this);
+        }
+
+        for (int x = 0; x < GRID_WIDTH; x++)
+        {
+            for (int y = 0; y < GRID_HEIGHT; y++)
             {
-                // Create a new GameObject
-                GameObject imageObject = new GameObject($"Image_{x}_{y}");
-
-
-                // Add Image component to the GameObject
+                GameObject imageObject = new GameObject($"Pixel_{x}_{y}"); // Nome mais descritivo
                 Image image = imageObject.AddComponent<Image>();
-
-                // Set the image color to white
                 image.color = Color.white;
 
-                // Set the parent of the imageObject to the Canvas
-                imageObject.transform.SetParent(this.transform);
-                imageObject.transform.localScale = Vector3.one;
+                // !!!!! CRÍTICO PARA DETECÇÃO DE CLIQUE PELO EVENTSYSTEM !!!!!
+                image.raycastTarget = true;
 
-                // Add the Image component to the array
+                imageObject.transform.SetParent(this.transform, false); // false para manter worldPositionStays
+                imageObject.transform.localScale = Vector3.one; // OK com GridLayoutGroup
+
+                // !!!!! CRÍTICO PARA FILTRO DE LAYERMASK NO DRAWINGMANAGER !!!!!
+                if (drawingLayer != -1)
+                {
+                    imageObject.layer = drawingLayer;
+                }
+                else // Fallback se a layer não existir (não ideal)
+                {
+                    Debug.LogWarning($"CanvasManager: Pixel_{x}_{y} não pôde ter a layer '{drawingCanvasLayerName}' atribuída.", imageObject);
+                }
+
                 imageArray[x, y] = image;
             }
         }
     }
 
-    // Public method to get the image array
     public Image[,] GetImageArray()
     {
         return imageArray;
     }
+
+    // Adicionados para consistência e acesso fácil
+    public int GetWidth() { return GRID_WIDTH; }
+    public int GetHeight() { return GRID_HEIGHT; }
 }
