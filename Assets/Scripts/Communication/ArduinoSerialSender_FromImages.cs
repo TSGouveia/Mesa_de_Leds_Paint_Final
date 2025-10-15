@@ -34,7 +34,7 @@ public class ArduinoSerialSender_FromImages_ManualZigzagMirror : MonoBehaviour /
     [SerializeField] private float autoConnectInterval = 3.0f;
 
     [Header("Canvas Representation")]
-    [Tooltip("Drag the Parent GameObject containing all the 'Image_X_Y' GameObjects here.")]
+    [Tooltip("Drag the Parent GameObject containing all the 'Pixel_X_Y' GameObjects here.")]
     [SerializeField] private Transform imageParent;
 
     [Header("Grid Dimensions (Match your setup)")]
@@ -209,7 +209,7 @@ public class ArduinoSerialSender_FromImages_ManualZigzagMirror : MonoBehaviour /
         {
             string objectName = imgComponent.gameObject.name;
             string[] nameParts = objectName.Split('_');
-            if (nameParts.Length == 3 && nameParts[0].Equals("Image", StringComparison.OrdinalIgnoreCase))
+            if (nameParts.Length == 3 && nameParts[0].Equals("Pixel", StringComparison.OrdinalIgnoreCase))
             {
                 if (int.TryParse(nameParts[1], out int x) && int.TryParse(nameParts[2], out int y))
                 {
@@ -226,7 +226,7 @@ public class ArduinoSerialSender_FromImages_ManualZigzagMirror : MonoBehaviour /
         if (foundCount == _numPixels) { Debug.Log($"Image Grid initialized successfully! Mapped {foundCount} images."); _gridInitialized = true; }
         else
         {
-            Debug.LogError($"Image Grid init FAILED! Expected {_numPixels}, mapped {foundCount}. Check 'Image_X_Y' naming/hierarchy."); _gridInitialized = false;
+            Debug.LogError($"Image Grid init FAILED! Expected {_numPixels}, mapped {foundCount}. Check 'Pixel_X_Y' naming/hierarchy."); _gridInitialized = false;
             for (int y = 0; y < gridHeight; y++) { for (int x = 0; x < gridWidth; x++) { if (_imageGrid[x, y] == null) Debug.LogWarning($"--> Missing image for [{x},{y}]."); } }
         }
     }
